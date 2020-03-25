@@ -11,18 +11,17 @@ namespace UDPReceiver
 {
     public class UdpReceiver
     {
-        //8 appears to be the highest power of two with which UDP can send a datagram.
+        //8 appears to be the highest exponent of two with which UDP can send a datagram.
         private int FileBufferSize = 1024 * 8;
         private const byte ACK = 6;
         private const byte EndOfFile = 3;
         private const byte EndOfTransmission = 4;
-        private int _serverPort = 45454;
+        private const int _serverPort = 45454;
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
 
         private static String fileName = "ReceivedFile";
-        private static String[] fileNames = {"b", "kb", "mb", "gb" };
-        private static String originalFilePath = "../UDPSender/1";
+        private static String originalFilePath = "../UDPSender/text";
 
         private static bool receiving = true;
         private static byte[] fileHash;
@@ -33,12 +32,14 @@ namespace UDPReceiver
 
         private byte[] receiveBuffer, sendBuffer;
 
-        public UdpReceiver()
+        public UdpReceiver(String address="localhost", int port = _serverPort)
         {
+            string server = "168.26.197.122";
             _udpReceiver = new UdpClient();
-            var localAddress = Dns.GetHostEntry("localhost").AddressList[1];
-            _endPoint = new IPEndPoint(localAddress, _serverPort);
-
+            var localAddress = Dns.GetHostEntry(address).AddressList[1];
+            //IPAddress a = new IPAddress();
+            //var x = IPAddress.Parse("168.26.197.122");
+            _endPoint = new IPEndPoint(localAddress, port);
             _udpReceiver.Connect(_endPoint);
 
             sendBuffer = new byte[1];
@@ -67,7 +68,7 @@ namespace UDPReceiver
                 {
                     response = _udpReceiver.Receive(ref _endPoint);
                     FileBufferSize = response[1] * 1024;
-                    originalFilePath = originalFilePath + fileNames[response[2]] + ".txt";
+                    originalFilePath = originalFilePath + ".txt";
                 }catch (SocketException)
                 {
                     if (timeouts > 40)
@@ -100,13 +101,7 @@ namespace UDPReceiver
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
-            byte control = receiveBuffer[FileBufferSize - 1];
-            if (control == EndOfFile || control == EndOfTransmission)
-            {
-                
-            }
             receiveBuffer = _udpReceiver.Receive(ref _endPoint);
-            byte[] writeBuffer = new byte[FileBufferSize];
             s.WriteLine(Encoding.ASCII.GetString(receiveBuffer));
 
 
@@ -144,9 +139,28 @@ namespace UDPReceiver
             _udpReceiver.Close();
         }
 
-        public static void Main()
+        public static void Main(String[] args)
         {
-            UdpReceiver receiver = new UdpReceiver();
+            
+            //TODO Accept optional IP and port from command line argument
+            UdpReceiver receiver;
+            if (args.Length == 2)
+            {
+                try
+                {
+                    receiver = new UdpReceiver(args[0], int.Parse(args[1]));
+                    
+                }
+                catch (ArgumentException e)
+                {
+                    throw new ArgumentException($"Failure using command line arguments: {e}");
+                }
+            }
+            else
+            {
+                receiver = new UdpReceiver();
+            }
+            
             receiver.Synchronize();
             
             MD5 hash = MD5.Create();
@@ -191,6 +205,9 @@ namespace UDPReceiver
                          _filesReceived); // Calculate average time taken to receive files from client
             Console.WriteLine("Average time to receive is {0}ms", averageTime);
             Console.WriteLine("Receiver is done. Received {0} correct files.", correctFiles);
+            Console.Write("Removing copied files...");
+            
+            Console.WriteLine("Done");
             receiver.Close();
             
         }

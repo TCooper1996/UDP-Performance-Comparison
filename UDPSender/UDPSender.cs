@@ -20,10 +20,10 @@ namespace UDPSender
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
 
-        private String fileName = "1gb.txt";
+        private String fileName = "text.txt";
         private string filePath;
 
-        private static int filesToBeSent = 10;//00;
+        private static int filesToBeSent = 100;
         private static int _filesSent = 0;
         private int resentPackets = 0;
 
@@ -38,17 +38,17 @@ namespace UDPSender
 
         private byte[] fileBytes, sendBuffer;
 
-        public UdpSender()
+        public UdpSender(int port)
         {
             try
             {
-                _udpSender = new UdpClient(serverPort); // Creates a new Datagram socket and binds it.
+                _udpSender = new UdpClient(port); // Creates a new Datagram socket and binds it.
             }
             catch (SocketException)
             {
                 // Assigns port number to any open port number on machine if specified port number above is taken
 
-                Log("Was unable to create socket with port number - " + serverPort + ".");
+                Log("Was unable to create socket with port number - " + port + ".");
                 Log("Auto-assigning port number.");
                 _udpSender = new UdpClient(); // Creates a new Datagram socket and binds it to an open port on machine
             }
@@ -67,28 +67,10 @@ namespace UDPSender
         private void Synchronize()
         {
             //parameters is sent to the receiver after sender has been contacted. It will contain an ack as its first byte, and it's 2nd byte contains the size of the packets
-            //and the third byte indicates the file to send where 0 = 1kb, 1 = 1mb, 2 = 1gb
-            byte[] parameters = new Byte[3];
+            byte[] parameters = new Byte[2];
             parameters[0] = ACK;
             parameters[1] = FileBufferSize / 1024;
-            //Copy file with cp outside of program
-            
-            switch (fileName)
-            {
-                case "1b.txt": parameters[2] = 0;
-                    break;
-                
-                case "1kb.txt": parameters[2] = 1;
-                    break;
-                
-                case "1mb.txt": parameters[2] = 2;
-                    break;
-                
-                case "1gb.txt": parameters[2] = 3;
-                    break;
-                
-                default: throw new Exception($"Unknown file {fileName}");
-            }
+            FileInfo f = new FileInfo(fileName);
 
             //Sender waits to be contacted
             Log("Waiting to be contacted...");
@@ -103,7 +85,7 @@ namespace UDPSender
             _endPoint = new IPEndPoint(_endPoint.Address, _endPoint.Port);
             Log($"Contacted by {_endPoint.Port}.... sending reply. The packet size will be {FileBufferSize} bytes");
             _udpSender.Connect(_endPoint);
-            _udpSender.Send(parameters, 3);
+            _udpSender.Send(parameters, 2);
 
             byte[] reply = _udpSender.Receive(ref _endPoint);
             if (reply[0] == 6)
@@ -208,8 +190,13 @@ namespace UDPSender
 
         public static void Main(string[] args)
         {
-
-            UdpSender sender = new UdpSender();
+            int port = 45454;
+            if (args.Length == 2)
+            {
+                port = Int32.Parse(args[1]);
+            }
+            
+            UdpSender sender = new UdpSender(port);
             sender.Synchronize();
 
             while (_filesSent < filesToBeSent)
