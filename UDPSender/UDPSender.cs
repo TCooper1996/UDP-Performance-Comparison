@@ -106,10 +106,10 @@ namespace UDPSender
         //Sends a packet and waits for acknowledgment
         //Returns true if packet sent successfully; false if aborted.
         //TODO: Abort on timeout and verify ack
-        private void SendPacket(Byte[] data)
+        private void SendPacket(Byte[] data, int length)
         {
             //Send pertinent data
-            _udpSender.Send(data, FileBufferSize);
+            _udpSender.Send(data, length);
 
             //Receive ACK
             _udpSender.Receive(ref _endPoint);
@@ -127,31 +127,35 @@ namespace UDPSender
             //Do not read whole file, read block, check return value for EOF, 64K
             using (FileStream fStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
-                //Clear the final byte.
-                fileBytes[FileBufferSize - 1] = 0;
+                //Clear control bytes
+                fileBytes[0] = 0; //The first two bytes will store the amount of data within each packet
+                fileBytes[1] = 0;
+                fileBytes[2] = 0; //The third byte will indicate whether or not this packet is the final packet of the file, or the final packet of the transmission
+                
                 Log($"I am sending to the receiver file #{_filesSent + 1}");
 
                 while (true)
                 {
                     long bytesLeft = fStream.Length - fStream.Position;
-                    int bytesToRead = (int)Math.Min(bytesLeft, FileBufferSize-1);
+                    int bytesToRead = (int)Math.Min(bytesLeft, FileBufferSize-3);
+                    Array.Copy(BitConverter.GetBytes(bytesToRead), 0, fileBytes, 0, 2);
                         
-                    fStream.Read(fileBytes, 0,
+                    fStream.Read(fileBytes, 3,
                         bytesToRead);
                     Log($"Sending packet {packetsSent}");
-                    if (bytesLeft <= FileBufferSize-1)
+                    if (bytesLeft <= FileBufferSize-3) // Check that the bytes that need to be sent are less than the size of the buffer size minus 3; this is because 3 control bytes are in the header.
                     {
                         if (_filesSent + 1 == filesToBeSent)
                         {
-                            //Set final byte to 4, indicating all files have been sent.
-                            fileBytes[FileBufferSize - 1] = EndOfTransmission;
+                            //Set final byte to EOT indicating all files have been sent.
+                            fileBytes[2] = EndOfTransmission;
                         }
                         else
                         {
-                            //Set final byte to 4, End-Of-Transmission, to indicate this final has been sent.
-                            fileBytes[FileBufferSize - 1] = EndOfFile;
+                            //Set final byte to EOF to indicate this file has been sent.
+                            fileBytes[2] = EndOfFile;
                         }
-                        SendPacket(fileBytes);
+                        SendPacket(fileBytes, bytesToRead);
                         _filesSent++;
                         break;
 
@@ -159,15 +163,13 @@ namespace UDPSender
                     else
                     {
 
-                        byte[] subArray = new byte[FileBufferSize];
-                        Array.Copy(fileBytes, 0, subArray, 0, sendBuffer.Length);
 
-                        SendPacket(fileBytes);
+                        SendPacket(fileBytes, bytesToRead);
                     }
 
                     packetsSent++;
-                    Stopwatch s = new Stopwatch();
-                    s.Start();
+                    //Stopwatch s = new Stopwatch();
+                    //s.Start();
                 }
             }
 

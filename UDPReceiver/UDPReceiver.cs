@@ -102,7 +102,11 @@ namespace UDPReceiver
         private void ReceivePacket(StreamWriter s)
         {
             receiveBuffer = _udpReceiver.Receive(ref _endPoint);
-            s.WriteLine(Encoding.ASCII.GetString(receiveBuffer));
+            byte[] sizeBytes = new byte[2];
+            Array.Copy(receiveBuffer, 0, sizeBytes, 0, 2);
+            
+            //Substring from 3 because we don't want to write the first 3 control bytes
+            s.Write(Encoding.ASCII.GetString(receiveBuffer).Substring(3, BitConverter.ToInt16(sizeBytes)));
 
 
             //Send Acknowledgement
@@ -122,7 +126,7 @@ namespace UDPReceiver
                 do
                 {
                     ReceivePacket(w);
-                    controlByte = receiveBuffer[FileBufferSize - 1];
+                    controlByte = receiveBuffer[0];
                 } while (controlByte != EndOfFile && controlByte != EndOfTransmission );
 
             }
@@ -205,12 +209,26 @@ namespace UDPReceiver
                          _filesReceived); // Calculate average time taken to receive files from client
             Console.WriteLine("Average time to receive is {0}ms", averageTime);
             Console.WriteLine("Receiver is done. Received {0} correct files.", correctFiles);
-            Console.Write("Removing copied files...");
-            
+            Console.Write("Removing copied files but one...");
+            Clean();
             Console.WriteLine("Done");
             receiver.Close();
             
         }
+
+        private static void Clean()
+        {
+            for (int i = 1; i < 100; i++)
+            {
+                String file = $"{fileName}{i}.txt";
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+
+            }
+        }
+
 
         private static bool FilesEqual(string f1)
         {
