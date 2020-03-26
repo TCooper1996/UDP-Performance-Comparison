@@ -101,13 +101,9 @@ namespace UDPReceiver
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
-            //The size of receiveBuffer will be equal to the length parameter of SendPacket in UDPSender.cs
             receiveBuffer = _udpReceiver.Receive(ref _endPoint);
-            //byte[] sizeBytes = new byte[2];
-            //Array.Copy(receiveBuffer, 0, sizeBytes, 0, 2);
             
-            //Substring from 3 because we don't want to write the first 3 control bytes
-            s.Write(Encoding.ASCII.GetString(receiveBuffer).Substring(3));
+            s.Write(Encoding.ASCII.GetString(receiveBuffer).Substring(1));
 
 
             //Send Acknowledgement
@@ -219,6 +215,7 @@ namespace UDPReceiver
 
         private static void Clean()
         {
+            //TODO: Set i=0 to remove ALL files.
             for (int i = 1; i < 100; i++)
             {
                 String file = $"{fileName}{i}.txt";

@@ -8,7 +8,6 @@
 
     <ItemGroup>
       <None Remove="ReceivedFile89.txt" />
-      <None Remove="ReceivedFile0.txt" />
       <None Remove="ReceivedFile1.txt" />
       <None Remove="ReceivedFile10.txt" />
       <None Remove="ReceivedFile11.txt" />

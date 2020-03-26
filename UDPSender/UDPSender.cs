@@ -155,7 +155,7 @@ namespace UDPSender
                             //Set final byte to EOF to indicate this file has been sent.
                             fileBytes[0] = EndOfFile;
                         }
-                        SendPacket(fileBytes, bytesToRead);
+                        SendPacket(fileBytes, bytesToRead + 1);
                         _filesSent++;
                         break;
 
