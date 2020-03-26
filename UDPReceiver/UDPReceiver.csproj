@@ -1,0 +1,112 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <RootNamespace>UDPServer</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Remove="ReceivedFile89.txt" />
+      <None Remove="ReceivedFile0.txt" />
+      <None Remove="ReceivedFile1.txt" />
+      <None Remove="ReceivedFile10.txt" />
+      <None Remove="ReceivedFile11.txt" />
+      <None Remove="ReceivedFile12.txt" />
+      <None Remove="ReceivedFile13.txt" />
+      <None Remove="ReceivedFile14.txt" />
+      <None Remove="ReceivedFile15.txt" />
+      <None Remove="ReceivedFile16.txt" />
+      <None Remove="ReceivedFile17.txt" />
+      <None Remove="ReceivedFile18.txt" />
+      <None Remove="ReceivedFile19.txt" />
+      <None Remove="ReceivedFile2.txt" />
+      <None Remove="ReceivedFile20.txt" />
+      <None Remove="ReceivedFile21.txt" />
+      <None Remove="ReceivedFile22.txt" />
+      <None Remove="ReceivedFile23.txt" />
+      <None Remove="ReceivedFile24.txt" />
+      <None Remove="ReceivedFile25.txt" />
+      <None Remove="ReceivedFile26.txt" />
+      <None Remove="ReceivedFile27.txt" />
+      <None Remove="ReceivedFile28.txt" />
+      <None Remove="ReceivedFile29.txt" />
+      <None Remove="ReceivedFile3.txt" />
+      <None Remove="ReceivedFile30.txt" />
+      <None Remove="ReceivedFile31.txt" />
+      <None Remove="ReceivedFile32.txt" />
+      <None Remove="ReceivedFile33.txt" />
+      <None Remove="ReceivedFile34.txt" />
+      <None Remove="ReceivedFile35.txt" />
+      <None Remove="ReceivedFile36.txt" />
+      <None Remove="ReceivedFile37.txt" />
+      <None Remove="ReceivedFile38.txt" />
+      <None Remove="ReceivedFile39.txt" />
+      <None Remove="ReceivedFile4.txt" />
+      <None Remove="ReceivedFile40.txt" />
+      <None Remove="ReceivedFile41.txt" />
+      <None Remove="ReceivedFile42.txt" />
+      <None Remove="ReceivedFile43.txt" />
+      <None Remove="ReceivedFile44.txt" />
+      <None Remove="ReceivedFile45.txt" />
+      <None Remove="ReceivedFile46.txt" />
+      <None Remove="ReceivedFile47.txt" />
+      <None Remove="ReceivedFile48.txt" />
+      <None Remove="ReceivedFile49.txt" />
+      <None Remove="ReceivedFile5.txt" />
+      <None Remove="ReceivedFile50.txt" />
+      <None Remove="ReceivedFile51.txt" />
+      <None Remove="ReceivedFile52.txt" />
+      <None Remove="ReceivedFile53.txt" />
+      <None Remove="ReceivedFile54.txt" />
+      <None Remove="ReceivedFile55.txt" />
+      <None Remove="ReceivedFile56.txt" />
+      <None Remove="ReceivedFile57.txt" />
+      <None Remove="ReceivedFile58.txt" />
+      <None Remove="ReceivedFile59.txt" />
+      <None Remove="ReceivedFile6.txt" />
+      <None Remove="ReceivedFile60.txt" />
+      <None Remove="ReceivedFile61.txt" />
+      <None Remove="ReceivedFile62.txt" />
+      <None Remove="ReceivedFile63.txt" />
+      <None Remove="ReceivedFile64.txt" />
+      <None Remove="ReceivedFile65.txt" />
+      <None Remove="ReceivedFile66.txt" />
+      <None Remove="ReceivedFile67.txt" />
+      <None Remove="ReceivedFile68.txt" />
+      <None Remove="ReceivedFile69.txt" />
+      <None Remove="ReceivedFile7.txt" />
+      <None Remove="ReceivedFile70.txt" />
+      <None Remove="ReceivedFile71.txt" />
+      <None Remove="ReceivedFile72.txt" />
+      <None Remove="ReceivedFile73.txt" />
+      <None Remove="ReceivedFile74.txt" />
+      <None Remove="ReceivedFile75.txt" />
+      <None Remove="ReceivedFile76.txt" />
+      <None Remove="ReceivedFile77.txt" />
+      <None Remove="ReceivedFile78.txt" />
+      <None Remove="ReceivedFile79.txt" />
+      <None Remove="ReceivedFile8.txt" />
+      <None Remove="ReceivedFile80.txt" />
+      <None Remove="ReceivedFile81.txt" />
+      <None Remove="ReceivedFile82.txt" />
+      <None Remove="ReceivedFile83.txt" />
+      <None Remove="ReceivedFile84.txt" />
+      <None Remove="ReceivedFile85.txt" />
+      <None Remove="ReceivedFile86.txt" />
+      <None Remove="ReceivedFile87.txt" />
+      <None Remove="ReceivedFile88.txt" />
+      <None Remove="ReceivedFile9.txt" />
+      <None Remove="ReceivedFile90.txt" />
+      <None Remove="ReceivedFile91.txt" />
+      <None Remove="ReceivedFile92.txt" />
+      <None Remove="ReceivedFile93.txt" />
+      <None Remove="ReceivedFile94.txt" />
+      <None Remove="ReceivedFile95.txt" />
+      <None Remove="ReceivedFile96.txt" />
+      <None Remove="ReceivedFile97.txt" />
+      <None Remove="ReceivedFile98.txt" />
+      <None Remove="ReceivedFile99.txt" />
+    </ItemGroup>
+
+</Project>

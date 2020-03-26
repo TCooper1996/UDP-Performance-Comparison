@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>netcoreapp3.1</TargetFramework>
+        <RootNamespace>UDPClient</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Remove="1gb.txt" />
+      <None Remove="1kb.txt" />
+      <None Remove="1mb.txt" />
+    </ItemGroup>
+
+</Project>

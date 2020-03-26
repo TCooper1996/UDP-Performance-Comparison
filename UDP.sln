@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPReceiver", "UDPReceiver\UDPReceiver.csproj", "{5AF001B0-E8F0-49FE-B673-E10C4ACE284C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UDPSender", "UDPSender\UDPSender.csproj", "{7C35D12C-ECF7-498E-A937-2613C66278C7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5AF001B0-E8F0-49FE-B673-E10C4ACE284C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5AF001B0-E8F0-49FE-B673-E10C4ACE284C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5AF001B0-E8F0-49FE-B673-E10C4ACE284C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5AF001B0-E8F0-49FE-B673-E10C4ACE284C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C35D12C-ECF7-498E-A937-2613C66278C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C35D12C-ECF7-498E-A937-2613C66278C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C35D12C-ECF7-498E-A937-2613C66278C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C35D12C-ECF7-498E-A937-2613C66278C7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
