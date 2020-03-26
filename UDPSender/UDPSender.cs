@@ -129,31 +129,31 @@ namespace UDPSender
             {
                 //Clear control bytes
                 fileBytes[0] = 0; //The first two bytes will store the amount of data within each packet
-                fileBytes[1] = 0;
-                fileBytes[2] = 0; //The third byte will indicate whether or not this packet is the final packet of the file, or the final packet of the transmission
+                //fileBytes[1] = 0;
+                //fileBytes[2] = 0; //The third byte will indicate whether or not this packet is the final packet of the file, or the final packet of the transmission
                 
                 Log($"I am sending to the receiver file #{_filesSent + 1}");
 
                 while (true)
                 {
                     long bytesLeft = fStream.Length - fStream.Position;
-                    int bytesToRead = (int)Math.Min(bytesLeft, FileBufferSize-3);
-                    Array.Copy(BitConverter.GetBytes(bytesToRead), 0, fileBytes, 0, 2);
+                    int bytesToRead = (int)Math.Min(bytesLeft, FileBufferSize-1);
+                    //Array.Copy(BitConverter.GetBytes(bytesToRead), 0, fileBytes, 0, 2);
                         
-                    fStream.Read(fileBytes, 3,
+                    fStream.Read(fileBytes, 1,
                         bytesToRead);
                     Log($"Sending packet {packetsSent}");
-                    if (bytesLeft <= FileBufferSize-3) // Check that the bytes that need to be sent are less than the size of the buffer size minus 3; this is because 3 control bytes are in the header.
+                    if (bytesLeft <= FileBufferSize-1) // Check that the bytes that need to be sent are less than the size of the buffer size minus 3; this is because 3 control bytes are in the header.
                     {
                         if (_filesSent + 1 == filesToBeSent)
                         {
                             //Set final byte to EOT indicating all files have been sent.
-                            fileBytes[2] = EndOfTransmission;
+                            fileBytes[0] = EndOfTransmission;
                         }
                         else
                         {
                             //Set final byte to EOF to indicate this file has been sent.
-                            fileBytes[2] = EndOfFile;
+                            fileBytes[0] = EndOfFile;
                         }
                         SendPacket(fileBytes, bytesToRead);
                         _filesSent++;

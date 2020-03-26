@@ -36,7 +36,7 @@ namespace UDPReceiver
         {
             string server = "168.26.197.122";
             _udpReceiver = new UdpClient();
-            var localAddress = Dns.GetHostEntry(address).AddressList[1];
+            var localAddress = Dns.GetHostEntry(address).AddressList[0];
             //IPAddress a = new IPAddress();
             //var x = IPAddress.Parse("168.26.197.122");
             _endPoint = new IPEndPoint(localAddress, port);
@@ -101,12 +101,13 @@ namespace UDPReceiver
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
+            //The size of receiveBuffer will be equal to the length parameter of SendPacket in UDPSender.cs
             receiveBuffer = _udpReceiver.Receive(ref _endPoint);
-            byte[] sizeBytes = new byte[2];
-            Array.Copy(receiveBuffer, 0, sizeBytes, 0, 2);
+            //byte[] sizeBytes = new byte[2];
+            //Array.Copy(receiveBuffer, 0, sizeBytes, 0, 2);
             
             //Substring from 3 because we don't want to write the first 3 control bytes
-            s.Write(Encoding.ASCII.GetString(receiveBuffer).Substring(3, BitConverter.ToInt16(sizeBytes)));
+            s.Write(Encoding.ASCII.GetString(receiveBuffer).Substring(3));
 
 
             //Send Acknowledgement
