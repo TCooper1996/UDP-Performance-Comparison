@@ -167,8 +167,6 @@ namespace UDPReceiver
             MD5 hash = MD5.Create();
             using (FileStream fStream = new FileStream(originalFilePath, FileMode.Open, FileAccess.Read))
             {
-                byte[] n = new byte[1];
-                fStream.Read(n, 0, 1);
                 fileHash = hash.ComputeHash(fStream);
             }
 
@@ -234,14 +232,15 @@ namespace UDPReceiver
             using (FileStream fs1 = new FileStream(f1, FileMode.Open, FileAccess.Read))
             {
                 byte[] receivedFileHash = hash.ComputeHash(fs1);
-                if (receivedFileHash == fileHash)
+                for (int i = 0; i < 16; i++)
                 {
-                    return true;
+                    if (receivedFileHash[i] != fileHash[i])
+                    {
+                        return false;
+                    }
                 }
-                else
-                {
-                    return false;
-                }
+
+                return true;
             }
 
         }
