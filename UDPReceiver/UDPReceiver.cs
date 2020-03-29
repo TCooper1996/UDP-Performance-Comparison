@@ -35,7 +35,7 @@ namespace UDPReceiver
         private UdpReceiver(string address="localhost", int port = ServerPort)
         {
             _udpReceiver = new UdpClient();
-            var localAddress = Dns.GetHostEntry(address).AddressList[0];
+            var localAddress = Dns.GetHostEntry(address).AddressList[(address=="localhost") ? 0 : 1];
             //IPAddress a = new IPAddress();
             //var x = IPAddress.Parse("168.26.197.122");
             _endPoint = new IPEndPoint(localAddress, port);
