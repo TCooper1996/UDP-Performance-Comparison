@@ -32,12 +32,10 @@ namespace UDPReceiver
 
         private byte[] _receiveBuffer, sendBuffer;
 
-        private UdpReceiver(string address="localhost", int port = ServerPort)
+        private UdpReceiver(string address="127.0.0.1", int port = ServerPort)
         {
             _udpReceiver = new UdpClient();
-            var localAddress = Dns.GetHostEntry(address).AddressList[(address=="localhost") ? 0 : 1];
-            //IPAddress a = new IPAddress();
-            //var x = IPAddress.Parse("168.26.197.122");
+            var localAddress = IPAddress.Parse(address);
             _endPoint = new IPEndPoint(localAddress, port);
             _udpReceiver.Connect(_endPoint);
 
