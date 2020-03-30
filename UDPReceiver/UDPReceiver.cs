@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Net;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading;
@@ -17,6 +19,10 @@ namespace UDPReceiver
         private const byte EndOfFile = 3;
         private const byte EndOfTransmission = 4;
         private const int ServerPort = 45454;
+        private const int windowSize = 8;
+        private int seqNum;
+        private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
+        
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
 
@@ -42,14 +48,20 @@ namespace UDPReceiver
             sendBuffer = new byte[1];
             sendBuffer[0] = 6; //Acknowledgement character code
 
+            packetBuffer = new List<byte[]>(windowSize);
+
         }
 
         //Contact sender, and wait for reply
         private void Synchronize()
         {
-            //Send enquiry.
-            byte[] enquiry = new Byte[1];
+            //Start by sending the starting sequence number
+            byte[] enquiry = new byte[5];
             enquiry[0] = 5;
+            var r = new Random();
+            seqNum = r.Next(0, Int32.MaxValue - 131080);
+            //Send the sender a random starting seqnum, taking into account the packet size and the largest file being 1GB, a maximum starting value of Int32.MaxValue-131080 should be more than low enough to prevent overflow.
+            Array.Copy(BitConverter.GetBytes(seqNum), 0,  enquiry, 1, 4);
 
             //Contact sender
             Log("Contacting Sender...");
@@ -81,6 +93,7 @@ namespace UDPReceiver
             _udpReceiver.Send(enquiry, 1);
             Log("Connected");
             _receiveBuffer = new byte[FileBufferSize];
+
         }
 
         private static void Log(String message)
@@ -97,12 +110,26 @@ namespace UDPReceiver
         private void ReceivePacket(StreamWriter s)
         {
             _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
-            
-            s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(1));
+            int num = BitConverter.ToInt32(_receiveBuffer, 1);
 
+            if (seqNum == num)
+            {
+                s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(1));
+                
+            }
+            else
+            {
+                int position = num - seqNum;
+                byte[] b = new byte[FileBufferSize];
+                packetBuffer[position] = b;
 
+            }
+
+            seqNum++;
+
+            sendBuffer = BitConverter.GetBytes(seqNum);
             //Send Acknowledgement
-            _udpReceiver.Send(sendBuffer, 1);
+            _udpReceiver.Send(sendBuffer, 4);
 
         }
 

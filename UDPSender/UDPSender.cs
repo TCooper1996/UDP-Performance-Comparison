@@ -5,6 +5,9 @@ using System.IO;
 using System.Security.Cryptography;
 using System;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
 
 namespace UDPSender
 {
@@ -15,6 +18,11 @@ namespace UDPSender
         private const byte Ack = 6;
         private const byte EndOfFile = 3;
         private const byte EndOfTransmission = 4;
+        private const int WindowSize = 8;
+        private int window;
+        private int packetsSending;
+        private int seqNum; //First set to the seqNum that the first packet sent will contain. Additionally, it will contain the number of the oldest unacknowledged packet.
+        private int currentSeqNum;
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
@@ -32,6 +40,35 @@ namespace UDPSender
         #endif
 
         private readonly byte[] _sendBuffer;
+        private readonly byte[] oldestPacketBuffer;
+
+        private void Receive(IAsyncResult ar)
+        {
+            byte[] data = new byte[4];
+            data = _udpSender.EndReceive(ar, ref _endPoint);
+            _udpSender.BeginReceive(new AsyncCallback(Receive), null);
+            packetsSending--;
+            int num = BitConverter.ToInt32(data, 1);
+            int index = num - seqNum;
+            if (num >= seqNum && num < seqNum + WindowSize)
+            {
+                window |= 1 << index; //Set bit at index to true
+                //While first bit is true, that is, while the oldest packet has been acknowledged
+                while (window % 2 == 1)
+                {
+                    window >>= 1;
+                    seqNum++;
+                }
+                
+            }
+            
+        }
+
+        //TODO: Asynchronous Resend
+        private void ResendPacket(object o, ElapsedEventArgs e)
+        {
+            
+        }
 
         public UdpSender(int port)
         {
@@ -54,36 +91,44 @@ namespace UDPSender
             _filePath = new FileInfo(FileName).FullName;
 
             _sendBuffer = new byte[FileBufferSize];
+
         }
         
         //Wait until contacted by receiver, then reply.
         private void Synchronize()
         {
             //parameters is sent to the receiver after sender has been contacted. It will contain an ack as its first byte, and it's 2nd byte contains the size of the packets
-            byte[] parameters = new byte[2];
+            byte[] parameters = new byte[3];
             parameters[0] = Ack;
             parameters[1] = FileBufferSize / 1024;
+            parameters[2] = WindowSize;
 
             //Sender waits to be contacted
             Log("Waiting to be contacted...");
 
-            byte[] request = new byte[2];
+            byte[] request = new byte[4];
             //Expect a response of 5. Otherwise, wait until one is received.
             while (request[0] != 5)
             {
                 request = _udpSender.Receive(ref _endPoint);
                 
             }
+
+            seqNum = BitConverter.ToInt32(request, 1);
+            currentSeqNum = seqNum;
+            
             _endPoint = new IPEndPoint(_endPoint.Address, _endPoint.Port);
             Log($"Contacted by {_endPoint.Port}.... sending reply. The packet size will be {FileBufferSize} bytes");
             _udpSender.Connect(_endPoint);
-            _udpSender.Send(parameters, 2);
+            _udpSender.Send(parameters, 3);
 
             byte[] reply = _udpSender.Receive(ref _endPoint);
             if (reply[0] == 6)
             {
                 Log("Connected.");
             }
+
+            _udpSender.BeginReceive(new AsyncCallback(Receive), null);
 
         }
 
@@ -104,7 +149,7 @@ namespace UDPSender
             _udpSender.Send(data, length);
 
             //Receive ACK
-            _udpSender.Receive(ref _endPoint);
+            //_udpSender.Receive(ref _endPoint);
         }
 
         //Sends a single file. 
@@ -115,24 +160,34 @@ namespace UDPSender
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
             
+            var timer = new System.Timers.Timer(2000);
+            timer.Elapsed += ResendPacket;
+            timer.Enabled = true;
+            
             int packetsSent = 0;
             //Do not read whole file, read block, check return value for EOF, 64K
+            //The first byte will contain a 0 if the packet is not the final packet in the file. If it contains the EndOfTransmission constant or EndOfFile constant, the receiver is informed that the file is finished.
+            //The next 4 bytes contain the sequence number.
             using (FileStream fStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read))
             {
-                //Clear control bytes
-                _sendBuffer[0] = 0; //The first two bytes will store the amount of data within each packet
-                //fileBytes[1] = 0;
-                //fileBytes[2] = 0; //The third byte will indicate whether or not this packet is the final packet of the file, or the final packet of the transmission
+                //Clear control byte
+                _sendBuffer[0] = 0;
                 
                 Log($"I am sending to the receiver file #{_filesSent + 1}");
 
                 do
                 {
+                    if (currentSeqNum - seqNum >= WindowSize)
+                    {
+                        Thread.Sleep(5);
+                    }
                     long bytesLeft = fStream.Length - fStream.Position;
                     int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - 1);
-                    //Array.Copy(BitConverter.GetBytes(bytesToRead), 0, fileBytes, 0, 2);
-
-                    fStream.Read(_sendBuffer, 1,
+                    
+                    //Copy over the bytes containing the seqNum
+                    Array.Copy(BitConverter.GetBytes(currentSeqNum), 0, _sendBuffer, 1, 4);
+                    
+                    fStream.Read(_sendBuffer, 5,
                         bytesToRead);
                     Log($"Sending packet {packetsSent}");
                     //The following block is executed when the remainder of the data can be placed on a final packet.
@@ -151,6 +206,8 @@ namespace UDPSender
 
                     }
                     SendPacket(_sendBuffer, bytesToRead + 1);
+                    currentSeqNum++;
+                    packetsSending++;
                     packetsSent++;
                 } while (_sendBuffer[0] != EndOfFile && _sendBuffer[0] != EndOfTransmission);
 
