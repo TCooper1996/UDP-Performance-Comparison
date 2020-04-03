@@ -44,11 +44,11 @@ namespace UDPSender
 
         private void Receive(IAsyncResult ar)
         {
-            byte[] data = new byte[4];
+            byte[] data = new byte[5];
             data = _udpSender.EndReceive(ar, ref _endPoint);
             _udpSender.BeginReceive(new AsyncCallback(Receive), null);
             packetsSending--;
-            int num = BitConverter.ToInt32(data, 1);
+            int num = BitConverter.ToInt32(data, 0);
             int index = num - seqNum;
             if (num >= seqNum && num < seqNum + WindowSize)
             {
@@ -106,7 +106,7 @@ namespace UDPSender
             //Sender waits to be contacted
             Log("Waiting to be contacted...");
 
-            byte[] request = new byte[4];
+            byte[] request = new byte[5];
             //Expect a response of 5. Otherwise, wait until one is received.
             while (request[0] != 5)
             {
@@ -177,12 +177,13 @@ namespace UDPSender
 
                 do
                 {
+                    //TODO: Suspend until seqNum increments
                     if (currentSeqNum - seqNum >= WindowSize)
                     {
-                        Thread.Sleep(5);
+                        Thread.Sleep(1);
                     }
                     long bytesLeft = fStream.Length - fStream.Position;
-                    int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - 1);
+                    int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - 5);
                     
                     //Copy over the bytes containing the seqNum
                     Array.Copy(BitConverter.GetBytes(currentSeqNum), 0, _sendBuffer, 1, 4);

@@ -66,7 +66,7 @@ namespace UDPReceiver
             //Contact sender
             Log("Contacting Sender...");
 
-            _udpReceiver.Send(enquiry, 1);
+            _udpReceiver.Send(enquiry, 5);
 
             byte[] response = new byte[1];
             int timeouts = 0;
