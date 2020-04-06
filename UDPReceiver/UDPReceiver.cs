@@ -20,7 +20,8 @@ namespace UDPReceiver
         private const byte EndOfTransmission = 4;
         private const int ServerPort = 45454;
         private const int windowSize = 8;
-        private int seqNum;
+        private const int dataOffset = 5; //Indicates the beginning of the actual data of a packet. Bytes up until this index are control data.
+        private int seqNum; // Contains the seqnum of the next packet expected
         private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
         
         private readonly UdpClient _udpReceiver;
@@ -104,8 +105,10 @@ namespace UDPReceiver
             #endif
         }
 
+
         // Receives data, sends ACK, and writes data to file.
-        //May be split into two methods.
+        // May be split into two methods.
+        // The seqnum sent to the sender for acknowledgement is thr seqnum of the next expected packet.
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
@@ -114,18 +117,24 @@ namespace UDPReceiver
 
             if (seqNum == num)
             {
-                s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(1));
-                
+                s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(dataOffset));
+                seqNum++;
+
+                while (seqNum == BitConverter.ToInt32(packetBuffer.First(), 1))
+                {
+                    s.Write(Encoding.ASCII.GetString(packetBuffer.First()).Substring(dataOffset));
+                    seqNum++;
+                    packetBuffer.RemoveAt(0);
+                }
+
             }
             else
             {
-                int position = num - seqNum;
-                byte[] b = new byte[FileBufferSize];
-                packetBuffer[position] = b;
+                int position = (num - seqNum) - 1; //How many packets ahead of the expected one is the one that was just received. We subtract one because if the seqnum we expect is, say, 50, and the one receive is 51, then the difference is 1, but it should be placed in index 0 of the cache.
+                Array.Copy(_receiveBuffer, packetBuffer[position], FileBufferSize); //Copy the given packet to the cache
 
             }
 
-            seqNum++;
 
             sendBuffer = BitConverter.GetBytes(seqNum);
             //Send Acknowledgement

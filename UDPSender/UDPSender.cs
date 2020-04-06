@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,10 @@ namespace UDPSender
         private int packetsSending;
         private int seqNum; //First set to the seqNum that the first packet sent will contain. Additionally, it will contain the number of the oldest unacknowledged packet.
         private int currentSeqNum;
+        private Queue<byte[]> packetBuffer; //Used to hold the data for sent packets, in case they need to be resent.
+        
+        private static AutoResetEvent waitForAck = new AutoResetEvent(false);
+        private bool waitingForAck = false;
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
@@ -39,29 +44,33 @@ namespace UDPSender
         private static TimeSpan startTime = DateTime.Now.TimeOfDay; 
         #endif
 
-        private readonly byte[] _sendBuffer;
+        //private readonly byte[] _sendBuffer;
         private readonly byte[] oldestPacketBuffer;
 
+        //Receive using cumulative acknowledgement
+        //The 
         private void Receive(IAsyncResult ar)
         {
             byte[] data = new byte[5];
             data = _udpSender.EndReceive(ar, ref _endPoint);
             _udpSender.BeginReceive(new AsyncCallback(Receive), null);
-            packetsSending--;
-            int num = BitConverter.ToInt32(data, 0);
-            int index = num - seqNum;
-            if (num >= seqNum && num < seqNum + WindowSize)
+            int ackNum = BitConverter.ToInt32(data, 0);
+            int packetsAcknowledged = ackNum - seqNum;
+            seqNum = ackNum;
+            for (int i = 0; i < packetsAcknowledged; i++)
             {
-                window |= 1 << index; //Set bit at index to true
-                //While first bit is true, that is, while the oldest packet has been acknowledged
-                while (window % 2 == 1)
-                {
-                    window >>= 1;
-                    seqNum++;
-                }
-                
+                packetBuffer.Dequeue();
+                packetsSending--;
             }
-            
+
+            //Free  main 
+            if (waitingForAck)
+            {
+                waitForAck.Set();
+                waitingForAck = false;
+
+            }
+
         }
 
         //TODO: Asynchronous Resend
@@ -90,7 +99,9 @@ namespace UDPSender
 
             _filePath = new FileInfo(FileName).FullName;
 
-            _sendBuffer = new byte[FileBufferSize];
+            //_sendBuffer = new byte[FileBufferSize];
+            
+            packetBuffer = new Queue<byte[]>(WindowSize);
 
         }
         
@@ -147,6 +158,8 @@ namespace UDPSender
         {
             //Send pertinent data
             _udpSender.Send(data, length);
+            
+            
 
             //Receive ACK
             //_udpSender.Receive(ref _endPoint);
@@ -156,6 +169,7 @@ namespace UDPSender
         //Returns true if successful.
         private void SendFile()
         {
+            bool sending = true;
 
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
@@ -170,25 +184,26 @@ namespace UDPSender
             //The next 4 bytes contain the sequence number.
             using (FileStream fStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read))
             {
-                //Clear control byte
-                _sendBuffer[0] = 0;
                 
                 Log($"I am sending to the receiver file #{_filesSent + 1}");
 
                 do
                 {
-                    //TODO: Suspend until seqNum increments
-                    if (currentSeqNum - seqNum >= WindowSize)
+                    while (packetBuffer.Count >= WindowSize)
                     {
-                        Thread.Sleep(1);
+                        //Thread.Sleep(1);
+                        waitingForAck = true;
+                        waitForAck.WaitOne();
                     }
+                    
+                    byte[] sendBuffer = new byte[FileBufferSize];
                     long bytesLeft = fStream.Length - fStream.Position;
                     int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - 5);
                     
                     //Copy over the bytes containing the seqNum
-                    Array.Copy(BitConverter.GetBytes(currentSeqNum), 0, _sendBuffer, 1, 4);
+                    Array.Copy(BitConverter.GetBytes(currentSeqNum), 0, sendBuffer, 1, 4);
                     
-                    fStream.Read(_sendBuffer, 5,
+                    fStream.Read(sendBuffer, 5,
                         bytesToRead);
                     Log($"Sending packet {packetsSent}");
                     //The following block is executed when the remainder of the data can be placed on a final packet.
@@ -197,20 +212,24 @@ namespace UDPSender
                         if (_filesSent + 1 == FilesToBeSent)
                         {
                             //Set final byte to EOT indicating all files have been sent.
-                            _sendBuffer[0] = EndOfTransmission;
+                            sendBuffer[0] = EndOfTransmission;
                         }
                         else
                         {
                             //Set final byte to EOF to indicate this file has been sent.
-                            _sendBuffer[0] = EndOfFile;
+                            sendBuffer[0] = EndOfFile;
                         }
 
+                        sending = false;
+
                     }
-                    SendPacket(_sendBuffer, bytesToRead + 1);
+                    //Cache the current packet in case it needs to be resent.
+                    packetBuffer.Enqueue(sendBuffer);
+                    SendPacket(sendBuffer, bytesToRead + 1);
                     currentSeqNum++;
                     packetsSending++;
                     packetsSent++;
-                } while (_sendBuffer[0] != EndOfFile && _sendBuffer[0] != EndOfTransmission);
+                } while (sending);
 
                 _filesSent++;
             }
