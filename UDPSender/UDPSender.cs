@@ -59,9 +59,10 @@ namespace UDPSender
             _sendBuffer = new byte[FileBufferSize];
         }
 
-        private void ResendPacket(object o, ElapsedEventArgs e)
+        private void ResendPacket(byte[] data, int length)
         {
-            _udpSender.SendAsync(_sendBuffer, sendLength);
+            Console.WriteLine("Resending packet");
+            _udpSender.SendAsync(data, length);
         }
         
         //Wait until contacted by receiver, then reply.
@@ -109,7 +110,7 @@ namespace UDPSender
         private void SendPacket(Byte[] data, int length)
         {
             Timer t = new Timer(2000);
-            t.Elapsed += ResendPacket;
+            t.Elapsed += (sender, args) => { ResendPacket(data, length); };
             
             //Send pertinent data
             _udpSender.Send(data, length);

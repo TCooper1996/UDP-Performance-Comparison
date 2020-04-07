@@ -48,6 +48,7 @@ namespace UDPReceiver
 
         private void ResendPacket(object o, ElapsedEventArgs e)
         {
+            Console.WriteLine("Resending Packet");
             _udpReceiver.Send(sendBuffer, 1);
         }
 
