@@ -10,6 +10,7 @@
       <None Remove="1gb.txt" />
       <None Remove="1kb.txt" />
       <None Remove="1mb.txt" />
+      <None Remove="UDPSender.exe" />
     </ItemGroup>
 
 </Project>

@@ -24,6 +24,7 @@ namespace UDPReceiver
         private  int SeqNum; //The first seqnum
         private int seqNum; // Contains the seqnum of the next packet expected
         private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
+        private int packetsReceived = 0;
         
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
@@ -111,12 +112,18 @@ namespace UDPReceiver
 
         // Receives data, sends ACK, and writes data to file.
         // May be split into two methods.
-        // The seqnum sent to the sender for acknowledgement is thr seqnum of the next expected packet.
+        // The seqnum sent to the sender for acknowledgement is the seqnum of the next expected packet.
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
             _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
             int num = BitConverter.ToInt32(_receiveBuffer, 1);
+
+            //If packet already received, discard.
+            if (num < seqNum)
+            {
+                return;
+            }
 
             if (seqNum == num)
             {
@@ -127,15 +134,20 @@ namespace UDPReceiver
                 {
                     s.Write(Encoding.ASCII.GetString(packetBuffer.First()).Substring(dataOffset));
                     seqNum++;
+                    packetsReceived++;
                     packetBuffer.RemoveAt(0);
                 }
 
             }
             else
             {
-                int position = (num - seqNum) - 1; //How many packets ahead of the expected one is the one that was just received. We subtract one because if the seqnum we expect is, say, 50, and the one receive is 51, then the difference is 1, but it should be placed in index 0 of the cache.
-                Array.Copy(_receiveBuffer, packetBuffer[position], FileBufferSize); //Copy the given packet to the cache
-
+                Console.WriteLine(packetBuffer.Count);
+                int packetsAhead = (num - seqNum) - 1; //What index into the buffer should it be placed based on it's seqnum?
+                if (packetsAhead >= packetBuffer.Count)
+                {
+                    packetBuffer.AddRange(new byte[packetsAhead-packetBuffer.Count][]); // Add space for the packets between this one and the next one.
+                }
+                Array.Copy(_receiveBuffer, packetBuffer[packetsAhead], FileBufferSize);
             }
 
 
@@ -148,6 +160,7 @@ namespace UDPReceiver
 
         private void ReceiveFile()
         {
+            packetsReceived = 0;
             //ControlByte contains a 3 if the file has finished sending, a 4 if all files have finished, and a 0  otherwise
             byte controlByte;
             Log($"Writing to {OutputFileNamePrefix}{_filesReceived}.txt");
