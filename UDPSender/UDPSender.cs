@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System;
 using System.Numerics;
+using System.Timers;
 
 namespace UDPSender
 {
@@ -32,6 +33,8 @@ namespace UDPSender
         #endif
 
         private readonly byte[] _sendBuffer;
+        private int sendLength; //Number of bytes last sent to receiver.
+        
 
         public UdpSender(int port)
         {
@@ -54,6 +57,11 @@ namespace UDPSender
             _filePath = new FileInfo(FileName).FullName;
 
             _sendBuffer = new byte[FileBufferSize];
+        }
+
+        private void ResendPacket(object o, ElapsedEventArgs e)
+        {
+            _udpSender.SendAsync(_sendBuffer, sendLength);
         }
         
         //Wait until contacted by receiver, then reply.
@@ -100,6 +108,9 @@ namespace UDPSender
         //TODO: Abort on timeout and verify ack
         private void SendPacket(Byte[] data, int length)
         {
+            Timer t = new Timer(2000);
+            t.Elapsed += ResendPacket;
+            
             //Send pertinent data
             _udpSender.Send(data, length);
 

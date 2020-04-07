@@ -6,6 +6,8 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Timers;
+using Timer = System.Timers.Timer;
 
 namespace UDPReceiver
 {
@@ -42,6 +44,11 @@ namespace UDPReceiver
             sendBuffer = new byte[1];
             sendBuffer[0] = 6; //Acknowledgement character code
 
+        }
+
+        private void ResendPacket(object o, ElapsedEventArgs e)
+        {
+            _udpReceiver.Send(sendBuffer, 1);
         }
 
         //Contact sender, and wait for reply
@@ -96,6 +103,9 @@ namespace UDPReceiver
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
+            Timer t = new Timer(2000);
+            t.Elapsed += ResendPacket;
+            
             _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
             
             s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(1));
