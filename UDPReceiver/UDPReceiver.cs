@@ -21,6 +21,7 @@ namespace UDPReceiver
         private const int ServerPort = 45454;
         private const int windowSize = 8;
         private const int dataOffset = 5; //Indicates the beginning of the actual data of a packet. Bytes up until this index are control data.
+        private  int SeqNum; //The first seqnum
         private int seqNum; // Contains the seqnum of the next packet expected
         private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
         
@@ -38,6 +39,7 @@ namespace UDPReceiver
         private static readonly TimeSpan StartTime = DateTime.Now.TimeOfDay;
 
         private byte[] _receiveBuffer, sendBuffer;
+        
 
         private UdpReceiver(string address="127.0.0.1", int port = ServerPort)
         {
@@ -61,6 +63,7 @@ namespace UDPReceiver
             enquiry[0] = 5;
             var r = new Random();
             seqNum = r.Next(0, Int32.MaxValue - 131080);
+            SeqNum = seqNum;
             //Send the sender a random starting seqnum, taking into account the packet size and the largest file being 1GB, a maximum starting value of Int32.MaxValue-131080 should be more than low enough to prevent overflow.
             Array.Copy(BitConverter.GetBytes(seqNum), 0,  enquiry, 1, 4);
 
@@ -120,7 +123,7 @@ namespace UDPReceiver
                 s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(dataOffset));
                 seqNum++;
 
-                while (seqNum == BitConverter.ToInt32(packetBuffer.First(), 1))
+                while (packetBuffer.Count > 0 && seqNum == BitConverter.ToInt32(packetBuffer.First(), 1))
                 {
                     s.Write(Encoding.ASCII.GetString(packetBuffer.First()).Substring(dataOffset));
                     seqNum++;
@@ -139,6 +142,7 @@ namespace UDPReceiver
             sendBuffer = BitConverter.GetBytes(seqNum);
             //Send Acknowledgement
             _udpReceiver.Send(sendBuffer, 4);
+            Log($"Awaiting packet {seqNum - SeqNum}");
 
         }
 

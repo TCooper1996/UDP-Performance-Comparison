@@ -38,6 +38,8 @@ namespace UDPSender
         private const int FilesToBeSent = 100;
         private static int _filesSent = 0;
 
+        private int repeats = 0;
+
         //Total time elapsed after all files sent.
         private static double _totalTimeSending = 0;
         #if DEBUG
@@ -48,35 +50,50 @@ namespace UDPSender
         private readonly byte[] oldestPacketBuffer;
 
         //Receive using cumulative acknowledgement
-        //The 
         private void Receive(IAsyncResult ar)
         {
             byte[] data = new byte[5];
             data = _udpSender.EndReceive(ar, ref _endPoint);
             _udpSender.BeginReceive(new AsyncCallback(Receive), null);
             int ackNum = BitConverter.ToInt32(data, 0);
-            int packetsAcknowledged = ackNum - seqNum;
-            seqNum = ackNum;
-            for (int i = 0; i < packetsAcknowledged; i++)
-            {
-                packetBuffer.Dequeue();
-                packetsSending--;
-            }
 
-            //Free  main 
-            if (waitingForAck)
+            //If packet has been requested multiple times, it may have been lost. Resend.
+            if (ackNum == seqNum)
             {
-                waitForAck.Set();
-                waitingForAck = false;
-
+                repeats++;
+                if (repeats > 3)
+                {
+                    ResendPacket(null, null);
+                    repeats = 0;
+                }
             }
+            else
+            {
+                int packetsAcknowledged = ackNum - seqNum;
+                seqNum = ackNum;
+                for (int i = 0; i < packetsAcknowledged; i++)
+                {
+                    packetBuffer.Dequeue();
+                    packetsSending--;
+                }
+
+                //Free main 
+                if (waitingForAck)
+                {
+                    waitForAck.Set();
+                    waitingForAck = false;
+
+                }
+                
+            }
+            
 
         }
 
         //TODO: Asynchronous Resend
         private void ResendPacket(object o, ElapsedEventArgs e)
         {
-            
+            _udpSender.SendAsync(packetBuffer.Peek(), FileBufferSize);
         }
 
         public UdpSender(int port)
