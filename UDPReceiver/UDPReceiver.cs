@@ -142,12 +142,15 @@ namespace UDPReceiver
             else
             {
                 Console.WriteLine(packetBuffer.Count);
-                int packetsAhead = (num - seqNum) - 1; //What index into the buffer should it be placed based on it's seqnum?
-                if (packetsAhead >= packetBuffer.Count)
+                int packetsAhead = num - seqNum; //What index into the buffer should it be placed based on it's seqnum?
+
+                //Add space for packets between expected packet and the received packet.
+                while (packetsAhead >= packetBuffer.Count)
                 {
-                    packetBuffer.AddRange(new byte[packetsAhead-packetBuffer.Count][]); // Add space for the packets between this one and the next one.
+                    byte[] p = new byte[FileBufferSize];
+                    packetBuffer.Add(p);
                 }
-                Array.Copy(_receiveBuffer, packetBuffer[packetsAhead], FileBufferSize);
+                Array.Copy(_receiveBuffer, packetBuffer[packetsAhead-1], _receiveBuffer.Length);
             }
 
 
