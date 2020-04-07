@@ -67,7 +67,7 @@ namespace UDPSender
                     repeats = 0;
                 }
             }
-            else
+            else if (ackNum > seqNum)
             {
                 int packetsAcknowledged = ackNum - seqNum;
                 seqNum = ackNum;
