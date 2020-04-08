@@ -21,6 +21,7 @@ namespace UDPReceiver
         private const int ServerPort = 45454;
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
+        private int seqNum;
 
         private const string OutputFileNamePrefix = "ReceivedFile";
         private const string OriginalFilePath = "../UDPSender/text.txt";
@@ -41,7 +42,7 @@ namespace UDPReceiver
             _endPoint = new IPEndPoint(localAddress, port);
             _udpReceiver.Connect(_endPoint);
 
-            sendBuffer = new byte[1];
+            sendBuffer = new byte[5];
             sendBuffer[0] = 6; //Acknowledgement character code
 
         }
@@ -55,14 +56,20 @@ namespace UDPReceiver
         //Contact sender, and wait for reply
         private void Synchronize()
         {
-            //Send enquiry.
-            byte[] enquiry = new Byte[1];
+            Random gen = new Random();
+            //Send enquiry, along with number of bytes for seqnum
+            byte[] enquiry = new Byte[5];
             enquiry[0] = 5;
+            //Copy starting seqnum to outgoing packet
+            //TODO: make this random again;
+            seqNum = 0; //gen.Next(Int32.MaxValue - (1024 * 1024 * 100 / (FileBufferSize)) - 1);
+            Array.Copy(BitConverter.GetBytes(seqNum), 0, enquiry, 1, 4);
+                
 
             //Contact sender
             Log("Contacting Sender...");
 
-            _udpReceiver.Send(enquiry, 1);
+            _udpReceiver.Send(enquiry, 5);
 
             byte[] response = new byte[1];
             int timeouts = 0;
@@ -105,15 +112,26 @@ namespace UDPReceiver
         private void ReceivePacket(StreamWriter s)
         {
             Timer t = new Timer(2000);
+            //t.Enabled = true;
             t.Elapsed += ResendPacket;
-            
-            _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
+            int inSeqNum;
+
+            //Receive until packet's seqNum matches the expected seqNum
+            do
+            {
+                _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
+                inSeqNum = BitConverter.ToInt32(_receiveBuffer, 1);
+
+            } while (seqNum != inSeqNum);
+
+            seqNum++;
             
             s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(1));
+            Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
 
 
             //Send Acknowledgement
-            _udpReceiver.Send(sendBuffer, 1);
+            _udpReceiver.Send(sendBuffer, 4);
 
         }
 

@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System;
 using System.Numerics;
 using System.Timers;
+using System.Text.RegularExpressions;
 
 namespace UDPSender
 {
@@ -16,6 +17,10 @@ namespace UDPSender
         private const byte Ack = 6;
         private const byte EndOfFile = 3;
         private const byte EndOfTransmission = 4;
+        
+        //Time in milliseconds that elapse before a packet is resent.
+        //This defaults two 2 seconds, but after a file is sent, it gets set to 1.5 times the average send time.
+        private int packetResendTime = 2000; 
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
@@ -25,6 +30,10 @@ namespace UDPSender
 
         private const int FilesToBeSent = 100;
         private static int _filesSent = 0;
+
+        private int seqNum;
+
+        Random r;
 
         //Total time elapsed after all files sent.
         private static double _totalTimeSending = 0;
@@ -57,6 +66,8 @@ namespace UDPSender
             _filePath = new FileInfo(FileName).FullName;
 
             _sendBuffer = new byte[FileBufferSize];
+
+            r = new Random();
         }
 
         private void ResendPacket(byte[] data, int length)
@@ -76,7 +87,7 @@ namespace UDPSender
             //Sender waits to be contacted
             Log("Waiting to be contacted...");
 
-            byte[] request = new byte[2];
+            byte[] request = new byte[5];
             //Expect a response of 5. Otherwise, wait until one is received.
             while (request[0] != 5)
             {
@@ -87,6 +98,8 @@ namespace UDPSender
             Log($"Contacted by {_endPoint.Port}.... sending reply. The packet size will be {FileBufferSize} bytes");
             _udpSender.Connect(_endPoint);
             _udpSender.Send(parameters, 2);
+
+            seqNum = BitConverter.ToInt32(request, 1);
 
             byte[] reply = _udpSender.Receive(ref _endPoint);
             if (reply[0] == 6)
@@ -106,17 +119,38 @@ namespace UDPSender
 
         //Sends a packet and waits for acknowledgment
         //Returns true if packet sent successfully; false if aborted.
-        //TODO: Abort on timeout and verify ack
         private void SendPacket(Byte[] data, int length)
         {
             Timer t = new Timer(2000);
+            t.Enabled = true;
             t.Elapsed += (sender, args) => { ResendPacket(data, length); };
+            byte[] recv;
             
             //Send pertinent data
-            _udpSender.Send(data, length);
+            #if DEBUG
+                if (r.NextDouble() <= 0.0004)
+                {
+                    Console.WriteLine("[DEBUG MODE] Purposely dropping packet.");
+                }
+                else
+                {
+                    _udpSender.Send(data, length);
+                    
+                }
+            #else
+                _udpSender.Send(data, length);
+            #endif
+            
 
             //Receive ACK
-            _udpSender.Receive(ref _endPoint);
+            do
+            {
+                recv = _udpSender.Receive(ref _endPoint);
+                
+            } while (recv[0] != Ack && BitConverter.ToInt32(recv) != seqNum);
+
+            seqNum++;
+            t.Enabled = false;
         }
 
         //Sends a single file. 
@@ -131,24 +165,24 @@ namespace UDPSender
             //Do not read whole file, read block, check return value for EOF, 64K
             using (FileStream fStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read))
             {
+                int controlLength = 5; //Number of control bytes;
                 //Clear control bytes
                 _sendBuffer[0] = 0; //The first two bytes will store the amount of data within each packet
-                //fileBytes[1] = 0;
-                //fileBytes[2] = 0; //The third byte will indicate whether or not this packet is the final packet of the file, or the final packet of the transmission
+                //Copy over sequence number
                 
                 Log($"I am sending to the receiver file #{_filesSent + 1}");
 
                 do
                 {
                     long bytesLeft = fStream.Length - fStream.Position;
-                    int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - 1);
-                    //Array.Copy(BitConverter.GetBytes(bytesToRead), 0, fileBytes, 0, 2);
+                    int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - controlLength);
+                    Array.Copy(BitConverter.GetBytes(seqNum), 0, _sendBuffer, 1, 4);
 
-                    fStream.Read(_sendBuffer, 1,
+                    fStream.Read(_sendBuffer, controlLength,
                         bytesToRead);
                     Log($"Sending packet {packetsSent}");
                     //The following block is executed when the remainder of the data can be placed on a final packet.
-                    if (bytesLeft <= FileBufferSize - 1)
+                    if (bytesLeft <= FileBufferSize - controlLength)
                     {
                         if (_filesSent + 1 == FilesToBeSent)
                         {
@@ -162,7 +196,8 @@ namespace UDPSender
                         }
 
                     }
-                    SendPacket(_sendBuffer, bytesToRead + 1);
+                    SendPacket(_sendBuffer, bytesToRead +  controlLength);
+                    
                     packetsSent++;
                 } while (_sendBuffer[0] != EndOfFile && _sendBuffer[0] != EndOfTransmission);
 
@@ -177,6 +212,8 @@ namespace UDPSender
             _totalTimeSending += ts.TotalMilliseconds;
             Log("The time used in millisecond to send " + FileName + " for the " + _filesSent +
                               "time is: " + (float) ts.TotalMilliseconds);
+            packetResendTime = (int)(ts.TotalMilliseconds*1.5) / packetsSent ;
+            Log($"Packet resend threshold set to {packetResendTime}");
 
         }
 
@@ -189,10 +226,15 @@ namespace UDPSender
         public static void Main(string[] args)
         {
             int port = 45454;
-            if (args.Length == 2)
+            Regex specifyPort = new Regex("-port:(.*)");
+            foreach (var arg in args)
             {
-                port = Int32.Parse(args[1]);
+                if (specifyPort.IsMatch(arg))
+                {
+                    port = Int32.Parse(arg.Substring(6));
+                }
             }
+            
             
             UdpSender sender = new UdpSender(port);
             sender.Synchronize();
