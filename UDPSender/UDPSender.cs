@@ -20,7 +20,7 @@ namespace UDPSender
         
         //Time in milliseconds that elapse before a packet is resent.
         //This defaults two 2 seconds, but after a file is sent, it gets set to 1.5 times the average send time.
-        private int packetResendTime = 2000; 
+        private int packetResendTime = 500; 
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
@@ -72,7 +72,7 @@ namespace UDPSender
 
         private void ResendPacket(byte[] data, int length)
         {
-            Console.WriteLine("Resending packet");
+            Console.WriteLine($"Resending packet #{BitConverter.ToInt32(data, 1)}");
             _udpSender.SendAsync(data, length);
         }
         
@@ -121,7 +121,7 @@ namespace UDPSender
         //Returns true if packet sent successfully; false if aborted.
         private void SendPacket(Byte[] data, int length)
         {
-            Timer t = new Timer(2000);
+            Timer t = new Timer(packetResendTime);
             t.Enabled = true;
             t.Elapsed += (sender, args) => { ResendPacket(data, length); };
             byte[] recv;
@@ -147,7 +147,7 @@ namespace UDPSender
             {
                 recv = _udpSender.Receive(ref _endPoint);
                 
-            } while (recv[0] != Ack && BitConverter.ToInt32(recv) != seqNum);
+            } while (recv[0] != Ack || BitConverter.ToInt32(recv, 1) != seqNum+1);
 
             seqNum++;
             t.Enabled = false;
@@ -212,7 +212,8 @@ namespace UDPSender
             _totalTimeSending += ts.TotalMilliseconds;
             Log("The time used in millisecond to send " + FileName + " for the " + _filesSent +
                               "time is: " + (float) ts.TotalMilliseconds);
-            packetResendTime = (int)(ts.TotalMilliseconds*1.5) / packetsSent ;
+            //Packet resend time is a minimum of two milliseconds.
+            packetResendTime = Math.Max((int)(ts.TotalMilliseconds*1.5) / packetsSent, 20) ;
             Log($"Packet resend threshold set to {packetResendTime}");
 
         }
