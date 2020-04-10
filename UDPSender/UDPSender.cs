@@ -25,6 +25,7 @@ namespace UDPSender
         private int seqNum; //First set to the seqNum that the first packet sent will contain. Additionally, it will contain the number of the oldest unacknowledged packet.
         private int currentSeqNum;
         private Queue<byte[]> packetBuffer; //Used to hold the data for sent packets, in case they need to be resent.
+        System.Timers.Timer timer = new System.Timers.Timer(400);
         
         private static AutoResetEvent waitForAck = new AutoResetEvent(false);
         private bool waitingForAck = false;
@@ -93,6 +94,7 @@ namespace UDPSender
         //TODO: Asynchronous Resend
         private void ResendPacket(object o, ElapsedEventArgs e)
         {
+            Log($"Resending packet #{BitConverter.ToInt32(packetBuffer.Peek(), 1)}");
             _udpSender.SendAsync(packetBuffer.Peek(), FileBufferSize);
         }
 
@@ -119,6 +121,7 @@ namespace UDPSender
             //_sendBuffer = new byte[FileBufferSize];
             
             packetBuffer = new Queue<byte[]>(WindowSize);
+            timer.Elapsed += ResendPacket;
 
         }
         
@@ -170,16 +173,10 @@ namespace UDPSender
 
         //Sends a packet and waits for acknowledgment
         //Returns true if packet sent successfully; false if aborted.
-        //TODO: Abort on timeout and verify ack
         private void SendPacket(Byte[] data, int length)
         {
             //Send pertinent data
             _udpSender.Send(data, length);
-            
-            
-
-            //Receive ACK
-            //_udpSender.Receive(ref _endPoint);
         }
 
         //Sends a single file. 
@@ -191,8 +188,6 @@ namespace UDPSender
             Stopwatch stopWatch = new Stopwatch();
             stopWatch.Start();
             
-            var timer = new System.Timers.Timer(2000);
-            timer.Elapsed += ResendPacket;
             timer.Enabled = true;
             
             int packetsSent = 0;

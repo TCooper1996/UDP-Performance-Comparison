@@ -8,6 +8,8 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Timers;
+using Timer = System.Timers.Timer;
 
 namespace UDPReceiver
 {
@@ -21,7 +23,7 @@ namespace UDPReceiver
         private const int ServerPort = 45454;
         private const int windowSize = 8;
         private const int dataOffset = 5; //Indicates the beginning of the actual data of a packet. Bytes up until this index are control data.
-        private  int SeqNum; //The first seqnum
+        private int SeqNum; //The first seqnum which will be randomly generated
         private int seqNum; // Contains the seqnum of the next packet expected
         private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
         private int packetsReceived = 0;
@@ -40,6 +42,8 @@ namespace UDPReceiver
         private static readonly TimeSpan StartTime = DateTime.Now.TimeOfDay;
 
         private byte[] _receiveBuffer, sendBuffer;
+        Timer timer = new Timer(500);
+
         
 
         private UdpReceiver(string address="127.0.0.1", int port = ServerPort)
@@ -48,12 +52,21 @@ namespace UDPReceiver
             var localAddress = IPAddress.Parse(address);
             _endPoint = new IPEndPoint(localAddress, port);
             _udpReceiver.Connect(_endPoint);
+            timer.Elapsed += (o, e) => { ResendPacket(); };
 
-            sendBuffer = new byte[1];
+            sendBuffer = new byte[5];
             sendBuffer[0] = 6; //Acknowledgement character code
 
             packetBuffer = new List<byte[]>(windowSize);
 
+        }
+
+
+        private void ResendPacket()
+        {
+            Log($"Resending Packet for ACK #{seqNum}");
+            Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
+            _udpReceiver.Send(sendBuffer, 5);
         }
 
         //Contact sender, and wait for reply
@@ -116,6 +129,8 @@ namespace UDPReceiver
         //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
+            
+            
             _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
             int num = BitConverter.ToInt32(_receiveBuffer, 1);
 
@@ -125,6 +140,7 @@ namespace UDPReceiver
                 return;
             }
 
+            //If the seqNum from the incoming packet matches the seqNum that we expect, then we write to out file
             if (seqNum == num)
             {
                 s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(dataOffset));
@@ -138,7 +154,9 @@ namespace UDPReceiver
                     packetBuffer.RemoveAt(0);
                 }
 
+
             }
+            //If the seqNum does not match, then it must be ahead. We store the packet in our cache and write it to the file later.
             else
             {
                 Console.WriteLine(packetBuffer.Count);
@@ -152,11 +170,13 @@ namespace UDPReceiver
                 }
                 Array.Copy(_receiveBuffer, packetBuffer[packetsAhead-1], _receiveBuffer.Length);
             }
+            timer.Stop();
+            timer.Start();
 
-
-            sendBuffer = BitConverter.GetBytes(seqNum);
+            Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
             //Send Acknowledgement
-            _udpReceiver.Send(sendBuffer, 4);
+            _udpReceiver.Send(sendBuffer, 5);
+            timer.Enabled = true;
             Log($"Awaiting packet {seqNum - SeqNum}");
 
         }
@@ -194,7 +214,6 @@ namespace UDPReceiver
         public static void Main(String[] args)
         {
             
-            //TODO Accept optional IP and port from command line argument
             UdpReceiver receiver;
             if (args.Length == 2)
             {
