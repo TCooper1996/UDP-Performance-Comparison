@@ -20,7 +20,7 @@ namespace UDPSender
         
         //Time in milliseconds that elapse before a packet is resent.
         //This defaults two 2 seconds, but after a file is sent, it gets set to 1.5 times the average send time.
-        private int packetResendTime = 500; 
+        private int _packetResendTime = 500; 
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
@@ -29,20 +29,19 @@ namespace UDPSender
         private readonly string _filePath;
 
         private const int FilesToBeSent = 100;
-        private static int _filesSent = 0;
+        private static int _filesSent;
 
-        private int seqNum;
+        private int _seqNum;
 
-        Random r;
 
         //Total time elapsed after all files sent.
-        private static double _totalTimeSending = 0;
+        private static double _totalTimeSending;
         #if DEBUG
         private static TimeSpan startTime = DateTime.Now.TimeOfDay; 
+        Random r;
         #endif
 
         private readonly byte[] _sendBuffer;
-        private int sendLength; //Number of bytes last sent to receiver.
         
 
         public UdpSender(int port)
@@ -67,12 +66,14 @@ namespace UDPSender
 
             _sendBuffer = new byte[FileBufferSize];
 
+            #if DEBUG
             r = new Random();
+            #endif
         }
 
         private void ResendPacket(byte[] data, int length)
         {
-            Console.WriteLine($"Resending packet #{BitConverter.ToInt32(data, 1)}");
+            Log($"Resending packet #{BitConverter.ToInt32(data, 1)}");
             _udpSender.SendAsync(data, length);
         }
         
@@ -99,7 +100,7 @@ namespace UDPSender
             _udpSender.Connect(_endPoint);
             _udpSender.Send(parameters, 2);
 
-            seqNum = BitConverter.ToInt32(request, 1);
+            _seqNum = BitConverter.ToInt32(request, 1);
 
             byte[] reply = _udpSender.Receive(ref _endPoint);
             if (reply[0] == 6)
@@ -121,7 +122,7 @@ namespace UDPSender
         //Returns true if packet sent successfully; false if aborted.
         private void SendPacket(Byte[] data, int length)
         {
-            Timer t = new Timer(packetResendTime);
+            Timer t = new Timer(_packetResendTime);
             t.Enabled = true;
             t.Elapsed += (sender, args) => { ResendPacket(data, length); };
             byte[] recv;
@@ -147,9 +148,9 @@ namespace UDPSender
             {
                 recv = _udpSender.Receive(ref _endPoint);
                 
-            } while (recv[0] != Ack || BitConverter.ToInt32(recv, 1) != seqNum+1);
+            } while (recv[0] != Ack || BitConverter.ToInt32(recv, 1) != _seqNum+1);
 
-            seqNum++;
+            _seqNum++;
             t.Enabled = false;
         }
 
@@ -176,7 +177,7 @@ namespace UDPSender
                 {
                     long bytesLeft = fStream.Length - fStream.Position;
                     int bytesToRead = (int) Math.Min(bytesLeft, FileBufferSize - controlLength);
-                    Array.Copy(BitConverter.GetBytes(seqNum), 0, _sendBuffer, 1, 4);
+                    Array.Copy(BitConverter.GetBytes(_seqNum), 0, _sendBuffer, 1, 4);
 
                     fStream.Read(_sendBuffer, controlLength,
                         bytesToRead);
@@ -213,8 +214,8 @@ namespace UDPSender
             Log("The time used in millisecond to send " + FileName + " for the " + _filesSent +
                               "time is: " + (float) ts.TotalMilliseconds);
             //Packet resend time is a minimum of two milliseconds.
-            packetResendTime = Math.Max((int)(ts.TotalMilliseconds*1.5) / packetsSent, 20) ;
-            Log($"Packet resend threshold set to {packetResendTime}");
+            _packetResendTime = Math.Max((int)(ts.TotalMilliseconds*1.5) / packetsSent, 20) ;
+            Log($"Packet resend threshold set to {_packetResendTime}");
 
         }
 

@@ -21,10 +21,11 @@ namespace UDPReceiver
         private const int ServerPort = 45454;
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
-        private int seqNum;
-        private Random gen;
-        private static int packetResendTime = 500;
-        private static int packetsReceived;
+        private int _seqNum;
+        private static int _packetResendTime = 500;
+        private static int _packetsReceived;
+        
+        private Random _gen;
 
         private const string OutputFileNamePrefix = "ReceivedFile";
         private const string OriginalFilePath = "../UDPSender/text.txt";
@@ -34,8 +35,11 @@ namespace UDPReceiver
         private static int _filesReceived;
 
         private static double _totalTimeReceiving;
+        
+        #if DEBUG
         private static readonly TimeSpan StartTime = DateTime.Now.TimeOfDay;
-
+        #endif
+        
         private byte[] _receiveBuffer, sendBuffer;
 
         private UdpReceiver(string address="127.0.0.1", int port = ServerPort)
@@ -52,20 +56,20 @@ namespace UDPReceiver
 
         private void ResendPacket(object o, ElapsedEventArgs e)
         {
-            Console.WriteLine($"Resending Packet for ACK #{BitConverter.ToInt32(sendBuffer, 1)}");
+            Log($"Resending Packet for ACK #{BitConverter.ToInt32(sendBuffer, 1)}");
             _udpReceiver.Send(sendBuffer, 5);
         }
 
         //Contact sender, and wait for reply
         private void Synchronize()
         {
-            gen = new Random();
+            _gen = new Random();
             //Send enquiry, along with number of bytes for seqnum
             byte[] enquiry = new Byte[5];
             enquiry[0] = 5;
             //Copy starting seqnum to outgoing packet
-            seqNum = gen.Next(Int32.MaxValue - (1024 * 1024 * 100 / (FileBufferSize)) - 1);
-            Array.Copy(BitConverter.GetBytes(seqNum), 0, enquiry, 1, 4);
+            _seqNum = _gen.Next(Int32.MaxValue - (1024 * 1024 * 100 / (FileBufferSize)) - 1);
+            Array.Copy(BitConverter.GetBytes(_seqNum), 0, enquiry, 1, 4);
                 
 
             //Contact sender
@@ -110,10 +114,9 @@ namespace UDPReceiver
 
         // Receives data, sends ACK, and writes data to file.
         //May be split into two methods.
-        //TODO: Abort on timeout and verify checksum
         private void ReceivePacket(StreamWriter s)
         {
-            Timer t = new Timer(packetResendTime);
+            Timer t = new Timer(_packetResendTime);
             t.Enabled = true;
             t.Elapsed += ResendPacket;
             int inSeqNum;
@@ -124,19 +127,19 @@ namespace UDPReceiver
                 _receiveBuffer = _udpReceiver.Receive(ref _endPoint);
                 inSeqNum = BitConverter.ToInt32(_receiveBuffer, 1);
 
-            } while (seqNum != inSeqNum);
+            } while (_seqNum != inSeqNum);
 
             t.Enabled = false;
-            packetsReceived++;
-            seqNum++;
+            _packetsReceived++;
+            _seqNum++;
             
             s.Write(Encoding.ASCII.GetString(_receiveBuffer).Substring(5));
-            Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
+            Array.Copy(BitConverter.GetBytes(_seqNum), 0, sendBuffer, 1, 4);
 
 
             //Send Acknowledgement
             #if DEBUG
-            if (gen.NextDouble() <= 0.0004)
+            if (_gen.NextDouble() <= 0.0004)
             {
                 Console.WriteLine("Purposely dropping packet");
             }
@@ -182,7 +185,6 @@ namespace UDPReceiver
         public static void Main(String[] args)
         {
             
-            //TODO Accept optional IP and port from command line argument
             UdpReceiver receiver;
             if (args.Length == 2)
             {
@@ -215,7 +217,7 @@ namespace UDPReceiver
             {
                 while (_receiving)
                 {
-                    packetsReceived = 0;
+                    _packetsReceived = 0;
                     Stopwatch stopwatch = new Stopwatch();
                     stopwatch.Start();
 
@@ -225,8 +227,8 @@ namespace UDPReceiver
                     TimeSpan t = stopwatch.Elapsed;
                     _totalTimeReceiving += t.TotalMilliseconds; // Increase total time for averaging later
                     w.WriteLine("File transaction #{0} took {1}ms", _filesReceived, t.TotalMilliseconds);
-                    packetResendTime = Math.Max((int)(t.TotalMilliseconds*1.5) / packetsReceived, 20) ;
-                    Log($"Packet resend threshold set to {packetResendTime}");
+                    _packetResendTime = Math.Max((int)(t.TotalMilliseconds*1.5) / _packetsReceived, 200) ;
+                    Log($"Packet resend threshold set to {_packetResendTime}");
                     _filesReceived++;
                     Log($"Files received: {_filesReceived}");
                 }
