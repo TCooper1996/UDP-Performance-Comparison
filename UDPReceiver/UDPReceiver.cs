@@ -27,6 +27,7 @@ namespace UDPReceiver
         private int seqNum; // Contains the seqnum of the next packet expected
         private List<byte[]> packetBuffer; //Contains packets that are waiting to be written to the file.
         private int packetsReceived = 0;
+        Random gen = new Random();
         
         private readonly UdpClient _udpReceiver;
         private IPEndPoint _endPoint;
@@ -42,7 +43,7 @@ namespace UDPReceiver
         private static readonly TimeSpan StartTime = DateTime.Now.TimeOfDay;
 
         private byte[] _receiveBuffer, sendBuffer;
-        Timer timer = new Timer(500);
+        Timer timer = new Timer(2000);
 
         
 
@@ -64,7 +65,7 @@ namespace UDPReceiver
 
         private void ResendPacket()
         {
-            Log($"Resending Packet for ACK #{seqNum}");
+            Log($"Repeating request packet for ACK #{seqNum}");
             Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
             _udpReceiver.Send(sendBuffer, 5);
         }
@@ -159,7 +160,7 @@ namespace UDPReceiver
             //If the seqNum does not match, then it must be ahead. We store the packet in our cache and write it to the file later.
             else
             {
-                Console.WriteLine(packetBuffer.Count);
+                Console.WriteLine("Caching");
                 int packetsAhead = num - seqNum; //What index into the buffer should it be placed based on it's seqnum?
 
                 //Add space for packets between expected packet and the received packet.
@@ -175,9 +176,20 @@ namespace UDPReceiver
 
             Array.Copy(BitConverter.GetBytes(seqNum), 0, sendBuffer, 1, 4);
             //Send Acknowledgement
-            _udpReceiver.Send(sendBuffer, 5);
+            #if DEBUG
+            if (gen.NextDouble() <= 0.004)
+            {
+                Console.WriteLine("[DEBUG] I am purposely dropping a packet.");
+            }
+            else
+            {
+                _udpReceiver.Send(sendBuffer, 5);
+            }
+            #else
+                _udpReceiver.Send(sendBuffer, 5);
+            #endif
             timer.Enabled = true;
-            Log($"Awaiting packet {seqNum - SeqNum}");
+            Log($"Awaiting packet {seqNum}");
 
         }
 
@@ -275,7 +287,7 @@ namespace UDPReceiver
             Console.WriteLine("Average time to receive is {0}ms", averageTime);
             Console.WriteLine("Receiver is done. Received {0} correct files.", correctFiles);
             Console.Write("Removing copied files but one...");
-            Clean();
+            //Clean();
             Console.WriteLine("Done");
             receiver.Close();
             

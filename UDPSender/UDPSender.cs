@@ -25,13 +25,15 @@ namespace UDPSender
         private int seqNum; //First set to the seqNum that the first packet sent will contain. Additionally, it will contain the number of the oldest unacknowledged packet.
         private int currentSeqNum;
         private Queue<byte[]> packetBuffer; //Used to hold the data for sent packets, in case they need to be resent.
-        System.Timers.Timer timer = new System.Timers.Timer(400);
+        System.Timers.Timer timer = new System.Timers.Timer(2000);
         
         private static AutoResetEvent waitForAck = new AutoResetEvent(false);
+        private static AutoResetEvent syncReceive = new AutoResetEvent(true);
         private bool waitingForAck = false;
 
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
+        private bool finished;
 
         private const string FileName = "text.txt";
         private readonly string _filePath;
@@ -39,7 +41,9 @@ namespace UDPSender
         private const int FilesToBeSent = 100;
         private static int _filesSent = 0;
 
+
         private int repeats = 0;
+        Random gen = new Random();
 
         //Total time elapsed after all files sent.
         private static double _totalTimeSending = 0;
@@ -53,49 +57,68 @@ namespace UDPSender
         //Receive using cumulative acknowledgement
         private void Receive(IAsyncResult ar)
         {
+            if (finished)
+            {
+                return;
+            }
+            
+            
             byte[] data = new byte[5];
             data = _udpSender.EndReceive(ar, ref _endPoint);
             _udpSender.BeginReceive(new AsyncCallback(Receive), null);
-            int ackNum = BitConverter.ToInt32(data, 0);
-
-            //If packet has been requested multiple times, it may have been lost. Resend.
-            if (ackNum == seqNum)
+            int ackNum = BitConverter.ToInt32(data, 1);
+            syncReceive.WaitOne();
+            if (ackNum <= seqNum)
             {
-                repeats++;
-                if (repeats > 3)
+                syncReceive.Set();
+                return;
+            }
+                
+            if (ackNum > seqNum)
+            {
+                Console.WriteLine($"I have received packet {ackNum}");
+                int packetsAcknowledged = ackNum - seqNum;
+                if (packetsAcknowledged >= 2)
                 {
-                    ResendPacket(null, null);
                     repeats = 0;
                 }
-            }
-            else if (ackNum > seqNum)
-            {
-                int packetsAcknowledged = ackNum - seqNum;
                 seqNum = ackNum;
                 for (int i = 0; i < packetsAcknowledged; i++)
                 {
+                    Console.WriteLine($"Pushes - Pops = {packetBuffer.Count}");
                     packetBuffer.Dequeue();
                     packetsSending--;
                 }
 
                 //Free main 
-                if (waitingForAck)
-                {
-                    waitForAck.Set();
-                    waitingForAck = false;
-
-                }
+                waitForAck.Set();
+                timer.Stop();
+                timer.Start();
                 
+
             }
-            
+
+            syncReceive.Set();
 
         }
 
-        //TODO: Asynchronous Resend
+
         private void ResendPacket(object o, ElapsedEventArgs e)
         {
+            repeats++;
             Log($"Resending packet #{BitConverter.ToInt32(packetBuffer.Peek(), 1)}");
-            _udpSender.SendAsync(packetBuffer.Peek(), FileBufferSize);
+            if (repeats == 3)
+            {
+                 Log($"Resending entire window");
+                foreach (var packet in packetBuffer.ToArray())
+                {
+                    _udpSender.SendAsync(packet, packet.Length);
+                }
+            }
+            else
+            {
+                _udpSender.SendAsync(packetBuffer.Peek(), packetBuffer.Peek().Length);
+            }
         }
 
         public UdpSender(int port)
@@ -176,7 +199,19 @@ namespace UDPSender
         private void SendPacket(Byte[] data, int length)
         {
             //Send pertinent data
-            _udpSender.Send(data, length);
+            #if DEBUG
+            if (gen.NextDouble() <= 0.0004)
+            {
+                Console.WriteLine("[DEBUG] I am purposely dropping a packet.");
+            }
+            else
+            {
+                _udpSender.Send(data, length);
+            }
+            #else
+                _udpSender.Send(data, length);
+            #endif
+            
         }
 
         //Sends a single file. 
@@ -203,9 +238,10 @@ namespace UDPSender
                 {
                     while (packetBuffer.Count >= WindowSize)
                     {
-                        //Thread.Sleep(1);
                         waitingForAck = true;
+                        Console.WriteLine("I am freezing");
                         waitForAck.WaitOne();
+                        Console.WriteLine("I am resuming");
                     }
                     
                     byte[] sendBuffer = new byte[FileBufferSize];
@@ -217,7 +253,7 @@ namespace UDPSender
                     
                     fStream.Read(sendBuffer, 5,
                         bytesToRead);
-                    Log($"Sending packet {packetsSent}");
+                    Log($"Sending packet {currentSeqNum}");
                     //The following block is executed when the remainder of the data can be placed on a final packet.
                     if (bytesLeft <= FileBufferSize - 1)
                     {
@@ -237,7 +273,7 @@ namespace UDPSender
                     }
                     //Cache the current packet in case it needs to be resent.
                     packetBuffer.Enqueue(sendBuffer);
-                    SendPacket(sendBuffer, bytesToRead + 1);
+                    SendPacket(sendBuffer, bytesToRead+5);
                     currentSeqNum++;
                     packetsSending++;
                     packetsSent++;
@@ -260,6 +296,7 @@ namespace UDPSender
         private void Close()
         {
             _udpSender.Close();
+            finished = true;
         }
 
 
