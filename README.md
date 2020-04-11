@@ -18,7 +18,12 @@ python3 gen.py
 To generate all three test files.
 
 <h1>Compiling</h1>
-If the binaries are mistakenly left out of date, they can be compiled from source **in their respective directories** using
+If the binaries are mistakenly left out of date, they can be quickly compiled by running 
+```shell
+python3 compile.py
+```
+This will produce release and debug builds in both directories.
+Alterenatively, they can be compiled from source **in their respective directories** using
 
 ```shell
 csc UDPReceiver.cs
