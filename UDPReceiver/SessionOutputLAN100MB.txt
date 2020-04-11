@@ -1,0 +1,6 @@
+File transaction #0 took 150833.1812ms
+File transaction #1 took 158160.868ms
+File transaction #2 took 137316.348ms
+File transaction #3 took 146023.0756ms
+File transaction #4 took 137176.8052ms
+Entire session took 729.51 seconds, average 7295.10ms per file.
