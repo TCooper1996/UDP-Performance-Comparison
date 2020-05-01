@@ -18,14 +18,16 @@ python3 gen.py
 To generate all three test files.
 
 <h1>Compiling</h1>
+
 If the binaries are mistakenly left out of date, they can be quickly compiled by running 
-```shell
+``
 python3 compile.py
-```
+``
+
 This will produce release and debug builds in both directories.
 Alterenatively, they can be compiled from source **in their respective directories** using
 
-```shell
+```
 csc UDPReceiver.cs
 ```
 To compile the sender, follow the same pattern in the UDPSender directory.
@@ -38,10 +40,10 @@ csc -define:DEBUG -out:UDPSender-Debug.exe UDPSender.cs
 The ```-out``` argument is optional and can used to distinguish the debug binary from the release binary; without it, the name of the executable will match the name of the .cs file.
 
 <h1>Running</h1>
-The binaries should be runnable on windows without additional dependencies **although it has not been tested**
-On Mac and Linux, (and windows, I believe) you can run these with 
 
-[mono](https://www.mono-project.com/download/stable/)
+The binaries should be runnable on windows without additional dependencies **although it has not been tested** .
+
+On Mac and Linux, (and windows, I believe) you can run these with [mono.](https://www.mono-project.com/download/stable/)
 
 For example, to run both the debug clients:
 
