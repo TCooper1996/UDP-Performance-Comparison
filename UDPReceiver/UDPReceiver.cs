@@ -5,6 +5,7 @@ using System.Net;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Timers;
 using Timer = System.Timers.Timer;
@@ -28,7 +29,10 @@ namespace UDPReceiver
         private Random _gen;
 
         private const string OutputFileNamePrefix = "ReceivedFile";
-        private const string OriginalFilePath = "../UDPSender/text.txt";
+        private const string OriginalFilePathPrefix = "../UDPSender/";
+        private static string originalFile;
+
+        private static bool preserveFiles = false;
 
         private static bool _receiving = true;
         private static byte[] _fileHash;
@@ -80,20 +84,32 @@ namespace UDPReceiver
             byte[] response = new byte[1];
             int timeouts = 0;
             //ASCII 6 for acknowledge
-            while (response[0] != Ack)
+            try
             {
-                try
+                response = _udpReceiver.Receive(ref _endPoint);
+            }catch (SocketException)
+            {
+                if (timeouts > 40)
                 {
-                    response = _udpReceiver.Receive(ref _endPoint);
-                }catch (SocketException)
-                {
-                    if (timeouts > 40)
-                    {
-                        throw new Exception("Could not connect to Sender");
-                    }
-                    timeouts++;
-                    Thread.Sleep(250);
+                    throw new Exception("Could not connect to Sender");
                 }
+                timeouts++;
+                Thread.Sleep(250);
+            }
+
+            switch (response[0])
+            {
+                case 0:
+                    originalFile = OriginalFilePathPrefix + "1kb.txt";
+                    break;
+                
+                case 1:
+                    originalFile = OriginalFilePathPrefix + "1mb.txt";
+                    break;
+                
+                case 2:
+                    originalFile = OriginalFilePathPrefix + "100mb.txt";
+                    break;
             }
 
             Log("Response received from sender.");
@@ -184,9 +200,9 @@ namespace UDPReceiver
 
         public static void Main(String[] args)
         {
-            
             UdpReceiver receiver;
-            if (args.Length == 2)
+            
+            if (args.Length >= 2)
             {
                 try
                 {
@@ -202,11 +218,17 @@ namespace UDPReceiver
             {
                 receiver = new UdpReceiver();
             }
+
+            if (args.Length == 3 && args[3] == "-preserveFiles")
+            {
+                preserveFiles = true;
+                Console.WriteLine("Preserving received files.");
+            }
             
             receiver.Synchronize();
             
             MD5 hash = MD5.Create();
-            using (FileStream fStream = new FileStream(OriginalFilePath, FileMode.Open, FileAccess.Read))
+            using (FileStream fStream = new FileStream(originalFile, FileMode.Open, FileAccess.Read))
             {
                 _fileHash = hash.ComputeHash(fStream);
             }
@@ -249,7 +271,10 @@ namespace UDPReceiver
             Console.WriteLine("Average time to receive is {0}ms", averageTime);
             Console.WriteLine("Receiver is done. Received {0} correct files.", correctFiles);
             Console.Write("Removing copied files but one...");
-            Clean();
+            if (!preserveFiles)
+            {
+                Clean();
+            }
             Console.WriteLine("Done");
             receiver.Close();
             
@@ -258,7 +283,7 @@ namespace UDPReceiver
         private static void Clean()
         {
             //TODO: Set i=0 to remove ALL files.
-            for (int i = 1; i < 100; i++)
+            for (int i = 1; i < _filesReceived; i ++)
             {
                 String file = $"{OutputFileNamePrefix}{i}.txt";
                 if (File.Exists(file))

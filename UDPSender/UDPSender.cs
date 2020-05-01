@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System;
+using System.Globalization;
+using System.Net.Mime;
 using System.Numerics;
 using System.Timers;
 using System.Text.RegularExpressions;
@@ -25,10 +27,10 @@ namespace UDPSender
         private readonly UdpClient _udpSender;
         private IPEndPoint _endPoint;
 
-        private const string FileName = "text.txt";
+        private static string FileName = "1kb.txt";
         private readonly string _filePath;
 
-        private const int FilesToBeSent = 100;
+        private static int FilesToBeSent = 100;
         private static int _filesSent;
 
         private int _seqNum;
@@ -54,12 +56,12 @@ namespace UDPSender
             {
                 // Assigns port number to any open port number on machine if specified port number above is taken
 
-                Log("Was unable to create socket with port number - " + port + ".");
-                Log("Auto-assigning port number.");
+                Console.WriteLine("Was unable to create socket with port number - " + port + ".");
+                Console.WriteLine("Auto-assigning port number.");
                 _udpSender = new UdpClient(); // Creates a new Datagram socket and binds it to an open port on machine
             }
             
-            Log($"Live at {((IPEndPoint)_udpSender.Client.LocalEndPoint).Port}");
+            Console.WriteLine($"Live at {((IPEndPoint)_udpSender.Client.LocalEndPoint).Port}");
 
 
             _filePath = new FileInfo(FileName).FullName;
@@ -80,9 +82,22 @@ namespace UDPSender
         //Wait until contacted by receiver, then reply.
         private void Synchronize()
         {
-            //parameters is sent to the receiver after sender has been contacted. It will contain an ack as its first byte, and it's 2nd byte contains the size of the packets
+            //parameters is sent to the receiver after sender has been contacted. It will contain 0,1 or 2 as its first byte indicating what file is being sent, and it's 2nd byte contains the size of the packets
             byte[] parameters = new byte[2];
-            parameters[0] = Ack;
+            switch (FileName)
+            {
+                case "1kb.txt":
+                    parameters[0] = 0;
+                    break;
+                
+                case "1mb.txt":
+                    parameters[0] = 1;
+                    break;
+                
+                case "100mb.txt":
+                    parameters[0] = 2;
+                    break;
+            }
             parameters[1] = FileBufferSize / 1024;
 
             //Sender waits to be contacted
@@ -229,13 +244,89 @@ namespace UDPSender
         {
             int port = 45454;
             Regex specifyPort = new Regex("-port:(.*)");
+            Regex specifyFilesToSend = new Regex("-volume:(.*)");
+            Regex specifyFileSize = new Regex("-fileSize:(.*)");
+            //If the following flag gets set to true, abort.
+            
+            
+            
+            bool abort = false;
             foreach (var arg in args)
             {
                 if (specifyPort.IsMatch(arg))
                 {
-                    port = Int32.Parse(arg.Substring(6));
+                    try
+                    {
+                        port = Int32.Parse(arg.Substring(6));
+                    }
+                    catch (FormatException)
+                    {
+                        Console.WriteLine($"Invalid argument: {arg}");
+                        abort = true;
+                    }
+                    continue;
                 }
+
+                if (specifyFilesToSend.IsMatch(arg))
+                {
+                    //var filesToSend = Int32.Parse(arg.Substring(8));
+                    try
+                    {
+                        if (Int32.TryParse(arg.Substring(8), out int filesToSend) && filesToSend > 0 &&
+                            filesToSend <= 100)
+                        {
+                            FilesToBeSent = filesToSend;
+                            continue;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Volume argument {arg} must be integer between 1 and 100 inclusively.");
+                            abort = true;
+
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                        Console.WriteLine($"Volume argument {arg} must be integer between 1 and 100 inclusively.");
+                        abort = true;
+                    }
+
+                }
+
+                if (specifyFileSize.IsMatch(arg))
+                {
+                    switch (arg.Substring(10))
+                    {
+                        case "1kb":
+                            FileName = "1kb.txt";
+                            break;
+                        
+                        case "1mb":
+                            FileName = "1mb.txt";
+                            break;
+                        
+                        case "100mb":
+                            FileName = "100mb.txt";
+                            break;
+                        
+                        default:
+                            Console.WriteLine($"Unknown fileSize value {arg.Substring(10)}. fileSize argument must be 1kb, 1mb, or 100mb.");
+                            abort = true;
+                            break;
+                    }
+
+                    continue;
+                }
+                Console.WriteLine($"Unknown argument {arg}. Make sure to place a ':' between the argument name and value.");
+                abort = true;
             }
+
+            if (abort)
+            {
+                return;
+            }
+            
+            Console.WriteLine($"Initialized to send {FilesToBeSent} copies of {FileName.Substring(0)} from port {port}");
             
             
             UdpSender sender = new UdpSender(port);
